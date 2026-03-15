@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  OWNER
+  ADMIN
+}
+
+enum BoatType {
+  YACHT
+  SPEEDBOAT
+  SAILBOAT
+}
+
+enum BookingType {
+  FULL_CHARTER
+  SEAT
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  REFUNDED
+}
+
+enum TripStatus {
+  DRAFT
+  OPEN
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  fullName      String
+  role          Role           @default(CUSTOMER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  ownedBoats    Boat[]
+  bookings      Booking[]
+  notifications Notification[]
+  reviews       Review[]
+}
+
+model Boat {
+  id               String      @id @default(uuid())
+  ownerId          String
+  owner            User        @relation(fields: [ownerId], references: [id])
+  title            String
+  description      String
+  boatType         BoatType
+  capacity         Int
+  pricePerHour     Decimal     @db.Decimal(10, 2)
+  pricePerSeat     Decimal     @db.Decimal(10, 2)
+  marina           String
+  latitude         Float?
+  longitude        Float?
+  amenities        String[]
+  photos           String[]
+  captainIncluded  Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  availabilities   Availability[]
+  trips            Trip[]
+  reviews          Review[]
+
+  @@index([marina])
+  @@index([boatType])
+}
+
+model Availability {
+  id          String   @id @default(uuid())
+  boatId      String
+  boat        Boat     @relation(fields: [boatId], references: [id])
+  startTime   DateTime
+  endTime     DateTime
+  isBlocked   Boolean  @default(false)
+
+  @@index([boatId, startTime, endTime])
+}
+
+model Trip {
+  id             String        @id @default(uuid())
+  boatId         String
+  boat           Boat          @relation(fields: [boatId], references: [id])
+  startTime      DateTime
+  endTime        DateTime
+  seatCapacity   Int
+  bookedSeats    Int           @default(0)
+  status         TripStatus    @default(OPEN)
+  bookings       Booking[]
+  createdAt      DateTime      @default(now())
+
+  @@unique([boatId, startTime, endTime])
+  @@index([startTime, status])
+}
+
+model Booking {
+  id                  String        @id @default(uuid())
+  userId              String
+  user                User          @relation(fields: [userId], references: [id])
+  tripId              String
+  trip                Trip          @relation(fields: [tripId], references: [id])
+  bookingType         BookingType
+  seatsReserved       Int
+  amount              Decimal       @db.Decimal(10, 2)
+  depositAmount       Decimal?      @db.Decimal(10, 2)
+  status              BookingStatus @default(PENDING)
+  stripePaymentIntent String?
+  createdAt           DateTime      @default(now())
+
+  @@index([userId, createdAt])
+  @@index([tripId, status])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Review {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  boatId           String
+  boat             Boat     @relation(fields: [boatId], references: [id])
+  ratingBoat       Int
+  ratingCaptain    Int
+  ratingExperience Int
+  comment          String
+  createdAt        DateTime @default(now())
+
+  @@index([boatId, createdAt])
+}
